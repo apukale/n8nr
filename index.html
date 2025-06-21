@@ -125,14 +125,13 @@
           body: JSON.stringify({ userInput: userMessage })
         });
 
-        // --- MODIFIED ERROR HANDLING AND JSON PARSING ---
-
         let responseText = '';
         try {
-          // First, try to get the response as text to see what's really there
+          // Try to get the response as text first. This is more robust.
           responseText = await response.text();
         } catch (textError) {
-          appendMessage('n8n', 'Error reading response body.', 'n8n');
+          // If even reading as text fails, it's a fundamental network issue.
+          appendMessage('n8n', 'Error: Could not read response body.', 'n8n');
           console.error("Error reading response body:", textError);
           return;
         }
@@ -143,11 +142,12 @@
           return;
         }
 
-        // Now, try to parse the text as JSON
+        // Now, try to parse the text as JSON.
         let data;
         try {
-          data = JSON.parse(responseText); // Use JSON.parse directly on the text
+          data = JSON.parse(responseText);
         } catch (jsonError) {
+          // If JSON.parse fails, display the raw text received.
           appendMessage('n8n', `JSON Parsing Error. Received: ${responseText}`, 'n8n');
           console.error("JSON Parsing Error:", jsonError);
           console.error("Raw response text was:", responseText);
@@ -159,16 +159,15 @@
         if (data.selectedTweet) {
           messageToSend = data.selectedTweet;
         } else {
-          // If selectedTweet is not found, display the whole JSON data
+          // If selectedTweet is not found, display the whole JSON data as a string
           messageToSend = JSON.stringify(data);
         }
         appendMessage('n8n', messageToSend, 'n8n');
 
-        // --- END OF MODIFIED SECTION ---
-
         chatBox.scrollTop = chatBox.scrollHeight;
 
-      } catch (networkError) { // This catches errors during the initial fetch itself (e.g., DNS, network blocked, CORS preflight failure)
+      } catch (networkError) {
+        // This catches errors during the initial fetch itself (e.g., DNS lookup failure, network blocked, CORS preflight failure)
         appendMessage('n8n', 'Network Error: Could not connect to webhook.', 'n8n');
         console.error("Network Error:", networkError);
       }
