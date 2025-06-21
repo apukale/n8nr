@@ -102,9 +102,9 @@
     function appendMessage(sender, text, cssClass) {
       const message = document.createElement('div');
       message.classList.add('message', cssClass);
-      // Sanitize text to prevent HTML injection if sender/text is untrusted
-      // For now, assuming sender is trusted and text from n8n might need sanitizing if it contains HTML
-      message.innerHTML = `<strong>${sender}:</strong><br>${text}`;
+      // Basic sanitization to prevent HTML injection, though ideally n8n response is plain text or safe HTML
+      const sanitizedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      message.innerHTML = `<strong>${sender}:</strong><br>${sanitizedText}`;
       chatBox.appendChild(message);
       chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -125,57 +125,52 @@
           body: JSON.stringify({ userInput: userMessage })
         });
 
-        // Check for non-OK status codes (like 404, 500, etc.)
-        if (!response.ok) {
-          let errorText = `HTTP error! status: ${response.status}`;
-          try {
-            // Try to parse the error response as JSON
-            const errorData = await response.json();
-            errorText = `HTTP error! status: ${response.status}, Message: ${JSON.stringify(errorData)}`;
-          } catch (e) {
-            // If response.json() fails, try to get the raw text
-            try {
-              const errorTextPlain = await response.text();
-              errorText = `HTTP error! status: ${response.status}, Response: ${errorTextPlain}`;
-            } catch (textError) {
-              // If even text() fails, just use the status
-              errorText = `HTTP error! status: ${response.status} (Could not read response body)`;
-            }
-          }
-          appendMessage('n8n', `Error: ${errorText}`, 'n8n');
+        // --- MODIFIED ERROR HANDLING AND JSON PARSING ---
+
+        let responseText = '';
+        try {
+          // First, try to get the response as text to see what's really there
+          responseText = await response.text();
+        } catch (textError) {
+          appendMessage('n8n', 'Error reading response body.', 'n8n');
+          console.error("Error reading response body:", textError);
           return;
         }
 
-        // Try to parse JSON. This is the most likely place for failure if the response isn't pure JSON.
-        try {
-          const data = await response.json();
-          let messageToSend = '';
-
-          // Check if selectedTweet exists, otherwise use the whole JSON data
-          if (data.selectedTweet) {
-            messageToSend = data.selectedTweet;
-          } else {
-            // If selectedTweet is not found, display the raw JSON data
-            messageToSend = JSON.stringify(data);
-          }
-          appendMessage('n8n', messageToSend, 'n8n');
-        } catch (jsonError) {
-          // This catch block specifically handles errors from response.json()
-          let responseBody = 'Could not parse response as JSON.';
-          try {
-            // Try to get the raw text to see what's actually there
-            responseBody = await response.text();
-          } catch (textError) {
-            responseBody = 'Response was not JSON and could not be read as text.';
-          }
-          appendMessage('n8n', `JSON Parsing Error: ${responseBody}`, 'n8n');
+        // Check if the response was OK (status code in 2xx range)
+        if (!response.ok) {
+          appendMessage('n8n', `HTTP error! status: ${response.status}. Response: ${responseText}`, 'n8n');
+          return;
         }
+
+        // Now, try to parse the text as JSON
+        let data;
+        try {
+          data = JSON.parse(responseText); // Use JSON.parse directly on the text
+        } catch (jsonError) {
+          appendMessage('n8n', `JSON Parsing Error. Received: ${responseText}`, 'n8n');
+          console.error("JSON Parsing Error:", jsonError);
+          console.error("Raw response text was:", responseText);
+          return;
+        }
+
+        // If parsing was successful, proceed to display the message
+        let messageToSend = '';
+        if (data.selectedTweet) {
+          messageToSend = data.selectedTweet;
+        } else {
+          // If selectedTweet is not found, display the whole JSON data
+          messageToSend = JSON.stringify(data);
+        }
+        appendMessage('n8n', messageToSend, 'n8n');
+
+        // --- END OF MODIFIED SECTION ---
 
         chatBox.scrollTop = chatBox.scrollHeight;
 
       } catch (networkError) { // This catches errors during the initial fetch itself (e.g., DNS, network blocked, CORS preflight failure)
         appendMessage('n8n', 'Network Error: Could not connect to webhook.', 'n8n');
-        console.error("Network Error:", networkError); // Log the full error to the console for debugging
+        console.error("Network Error:", networkError);
       }
     });
   </script>
