@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat with n8n</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
+    #chatBox { border: 1px solid #ccc; background: white; padding: 10px; height: 400px; overflow-y: scroll; margin-bottom: 10px; }
+    .message { margin: 5px 0; }
+    .user { font-weight: bold; color: blue; }
+    .n8n { font-weight: bold; color: green; }
+  </style>
+</head>
+<body>
+
+  <h2>n8n Chat Interface</h2>
+  <div id="chatBox"></div>
+
+  <form id="chatForm">
+    <input type="text" id="userInput" placeholder="Type a number or message..." style="width: 80%;" required>
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    const webhookURL = 'https://n8nr.digitalakara.com/webhook/chat'; // Change this to your webhook URL
+    const chatBox = document.getElementById('chatBox');
+    const form = document.getElementById('chatForm');
+    const input = document.getElementById('userInput');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userMessage = input.value.trim();
+      if (!userMessage) return;
+
+      appendMessage('You', userMessage, 'user');
+      input.value = '';
+
+      try {
+        const response = await fetch(webhookURL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userInput: userMessage })
+        });
+
+        const data = await response.json();
+        appendMessage('n8n', data.selectedTweet || JSON.stringify(data), 'n8n');
+
+      } catch (error) {
+        appendMessage('n8n', 'Error connecting to webhook.', 'n8n');
+      }
+    });
+
+    function appendMessage(sender, text, cssClass) {
+      const message = document.createElement('div');
+      message.classList.add('message');
+      message.innerHTML = `<span class="${cssClass}">${sender}:</span> ${text}`;
+      chatBox.appendChild(message);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  </script>
+
+</body>
+</html>
