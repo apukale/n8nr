@@ -3,27 +3,111 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat with n8n</title>
+  <title>n8n Professional Chat</title>
   <style>
-    body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
-    #chatBox { border: 1px solid #ccc; background: white; padding: 10px; height: 400px; overflow-y: scroll; margin-bottom: 10px; }
-    .message { margin: 5px 0; }
-    .user { font-weight: bold; color: blue; }
-    .n8n { font-weight: bold; color: green; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #121212;
+      color: #f1f1f1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      padding: 15px;
+      background-color: #1f1f1f;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #00c853;
+      border-bottom: 1px solid #333;
+    }
+
+    #chatBox {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 15px;
+      line-height: 1.5;
+      font-size: 1rem;
+      word-wrap: break-word;
+    }
+
+    .user {
+      background-color: #2962ff;
+      align-self: flex-end;
+      color: #fff;
+    }
+
+    .n8n {
+      background-color: #333;
+      align-self: flex-start;
+      color: #e0e0e0;
+    }
+
+    form {
+      display: flex;
+      padding: 15px;
+      background-color: #1f1f1f;
+      border-top: 1px solid #333;
+    }
+
+    input {
+      flex: 1;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 20px;
+      outline: none;
+      font-size: 1rem;
+      background-color: #2c2c2c;
+      color: #fff;
+      margin-right: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 20px;
+      background-color: #00c853;
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #00b34c;
+    }
   </style>
 </head>
 <body>
 
-  <h2>n8n Chat Interface</h2>
+  <header>n8n Chat</header>
+
   <div id="chatBox"></div>
 
   <form id="chatForm">
-    <input type="text" id="userInput" placeholder="Type a number or message..." style="width: 80%;" required>
+    <input type="text" id="userInput" placeholder="Type your message or number..." required autocomplete="off">
     <button type="submit">Send</button>
   </form>
 
   <script>
-    const webhookURL = 'https://n8nr.digitalakara.com/webhook/0db2df60-6158-4b57-9876-363f25cfde54/chat'; // Change this to your webhook URL
+    const webhookURL = 'https://n8nr.digitalakara.com/webhook/0db2df60-6158-4b57-9876-363f25cfde54'; // Replace if needed
     const chatBox = document.getElementById('chatBox');
     const form = document.getElementById('chatForm');
     const input = document.getElementById('userInput');
@@ -35,6 +119,7 @@
 
       appendMessage('You', userMessage, 'user');
       input.value = '';
+      chatBox.scrollTop = chatBox.scrollHeight;
 
       try {
         const response = await fetch(webhookURL, {
@@ -43,8 +128,14 @@
           body: JSON.stringify({ userInput: userMessage })
         });
 
+        if (!response.ok) {
+          appendMessage('n8n', 'Error: Failed to connect to webhook.', 'n8n');
+          return;
+        }
+
         const data = await response.json();
         appendMessage('n8n', data.selectedTweet || JSON.stringify(data), 'n8n');
+        chatBox.scrollTop = chatBox.scrollHeight;
 
       } catch (error) {
         appendMessage('n8n', 'Error connecting to webhook.', 'n8n');
@@ -53,8 +144,8 @@
 
     function appendMessage(sender, text, cssClass) {
       const message = document.createElement('div');
-      message.classList.add('message');
-      message.innerHTML = `<span class="${cssClass}">${sender}:</span> ${text}`;
+      message.classList.add('message', cssClass);
+      message.innerHTML = `<strong>${sender}:</strong><br>${text}`;
       chatBox.appendChild(message);
       chatBox.scrollTop = chatBox.scrollHeight;
     }
