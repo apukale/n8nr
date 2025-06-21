@@ -10,7 +10,6 @@
       margin: 0;
       padding: 0;
     }
-
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #121212;
@@ -19,7 +18,6 @@
       flex-direction: column;
       height: 100vh;
     }
-
     header {
       padding: 15px;
       background-color: #1f1f1f;
@@ -29,7 +27,6 @@
       color: #00c853;
       border-bottom: 1px solid #333;
     }
-
     #chatBox {
       flex: 1;
       padding: 20px;
@@ -38,7 +35,6 @@
       flex-direction: column;
       gap: 15px;
     }
-
     .message {
       max-width: 70%;
       padding: 12px 16px;
@@ -47,26 +43,22 @@
       font-size: 1rem;
       word-wrap: break-word;
     }
-
     .user {
       background-color: #2962ff;
       align-self: flex-end;
       color: #fff;
     }
-
     .n8n {
       background-color: #333;
       align-self: flex-start;
       color: #e0e0e0;
     }
-
     form {
       display: flex;
       padding: 15px;
       background-color: #1f1f1f;
       border-top: 1px solid #333;
     }
-
     input {
       flex: 1;
       padding: 10px 15px;
@@ -78,7 +70,6 @@
       color: #fff;
       margin-right: 10px;
     }
-
     button {
       padding: 10px 20px;
       border: none;
@@ -89,30 +80,34 @@
       cursor: pointer;
       transition: background-color 0.3s ease;
     }
-
     button:hover {
       background-color: #00b34c;
     }
   </style>
 </head>
 <body>
-
   <header>n8n Chat</header>
-
   <div id="chatBox"></div>
-
   <form id="chatForm">
     <input type="text" id="userInput" placeholder="Type your message or number..." required autocomplete="off">
     <button type="submit">Send</button>
   </form>
-
   <script>
     // ✅ Correct Webhook Trigger URL
     const webhookURL = 'https://n8nr.digitalakara.com/webhook/n8nchat';
-
     const chatBox = document.getElementById('chatBox');
     const form = document.getElementById('chatForm');
     const input = document.getElementById('userInput');
+
+    function appendMessage(sender, text, cssClass) {
+      const message = document.createElement('div');
+      message.classList.add('message', cssClass);
+      // Sanitize text to prevent HTML injection if sender/text is untrusted
+      // For now, assuming sender is trusted and text from n8n might need sanitizing if it contains HTML
+      message.innerHTML = `<strong>${sender}:</strong><br>${text}`;
+      chatBox.appendChild(message);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -130,28 +125,59 @@
           body: JSON.stringify({ userInput: userMessage })
         });
 
+        // Check for non-OK status codes (like 404, 500, etc.)
         if (!response.ok) {
-          appendMessage('n8n', 'Error: Failed to connect to webhook.', 'n8n');
+          let errorText = `HTTP error! status: ${response.status}`;
+          try {
+            // Try to parse the error response as JSON
+            const errorData = await response.json();
+            errorText = `HTTP error! status: ${response.status}, Message: ${JSON.stringify(errorData)}`;
+          } catch (e) {
+            // If response.json() fails, try to get the raw text
+            try {
+              const errorTextPlain = await response.text();
+              errorText = `HTTP error! status: ${response.status}, Response: ${errorTextPlain}`;
+            } catch (textError) {
+              // If even text() fails, just use the status
+              errorText = `HTTP error! status: ${response.status} (Could not read response body)`;
+            }
+          }
+          appendMessage('n8n', `Error: ${errorText}`, 'n8n');
           return;
         }
 
-        const data = await response.json();
-        appendMessage('n8n', data.selectedTweet || JSON.stringify(data), 'n8n');
+        // Try to parse JSON. This is the most likely place for failure if the response isn't pure JSON.
+        try {
+          const data = await response.json();
+          let messageToSend = '';
+
+          // Check if selectedTweet exists, otherwise use the whole JSON data
+          if (data.selectedTweet) {
+            messageToSend = data.selectedTweet;
+          } else {
+            // If selectedTweet is not found, display the raw JSON data
+            messageToSend = JSON.stringify(data);
+          }
+          appendMessage('n8n', messageToSend, 'n8n');
+        } catch (jsonError) {
+          // This catch block specifically handles errors from response.json()
+          let responseBody = 'Could not parse response as JSON.';
+          try {
+            // Try to get the raw text to see what's actually there
+            responseBody = await response.text();
+          } catch (textError) {
+            responseBody = 'Response was not JSON and could not be read as text.';
+          }
+          appendMessage('n8n', `JSON Parsing Error: ${responseBody}`, 'n8n');
+        }
+
         chatBox.scrollTop = chatBox.scrollHeight;
 
-      } catch (error) {
-        appendMessage('n8n', 'Error connecting to webhook.', 'n8n');
+      } catch (networkError) { // This catches errors during the initial fetch itself (e.g., DNS, network blocked, CORS preflight failure)
+        appendMessage('n8n', 'Network Error: Could not connect to webhook.', 'n8n');
+        console.error("Network Error:", networkError); // Log the full error to the console for debugging
       }
     });
-
-    function appendMessage(sender, text, cssClass) {
-      const message = document.createElement('div');
-      message.classList.add('message', cssClass);
-      message.innerHTML = `<strong>${sender}:</strong><br>${text}`;
-      chatBox.appendChild(message);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
   </script>
-
 </body>
 </html>
