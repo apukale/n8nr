@@ -94,7 +94,7 @@
   </form>
   <script>
     // ✅ Correct Webhook Trigger URL
-    const webhookURL = 'https://n8nr.digitalakara.com/webhook/mrachat';
+    const webhookURL = 'https://n8nr.digitalakara.com/webhook/mrachat'; // <-- Ensure this is your current webhook URL
     const chatBox = document.getElementById('chatBox');
     const form = document.getElementById('chatForm');
     const input = document.getElementById('userInput');
@@ -121,7 +121,9 @@
       try {
         const response = await fetch(webhookURL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // REMOVED HEADERS TO SIMPLIFY AND BYPASS PREFLIGHT
+          // If you need Content-Type: application/json, you'll need to configure CORS properly in cloudflared
+          // headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userInput: userMessage })
         });
 
@@ -139,7 +141,7 @@
           return;
         }
 
-        // If response.ok is true, try to get the response as text
+        // Try to get the response as text.
         let responseText = '';
         try {
           responseText = await response.text();
@@ -149,8 +151,26 @@
           return;
         }
 
-        // Display whatever text we received. This is the main change for this test.
-        appendMessage('n8n', responseText, 'n8n');
+        // Now, try to parse the text as JSON.
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (jsonError) {
+          // If JSON.parse fails, display the raw text received.
+          appendMessage('n8n', `JSON Parsing Error. Received: ${responseText}`, 'n8n');
+          console.error("JSON Parsing Error:", jsonError);
+          return;
+        }
+
+        // If parsing was successful, proceed to display the message
+        let messageToSend = '';
+        if (data.selectedTweet) {
+          messageToSend = data.selectedTweet;
+        } else {
+          // If selectedTweet is not found, display the whole JSON data as a string
+          messageToSend = JSON.stringify(data);
+        }
+        appendMessage('n8n', messageToSend, 'n8n');
 
         chatBox.scrollTop = chatBox.scrollHeight;
 
