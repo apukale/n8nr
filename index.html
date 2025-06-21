@@ -102,7 +102,7 @@
     function appendMessage(sender, text, cssClass) {
       const message = document.createElement('div');
       message.classList.add('message', cssClass);
-      // Basic sanitization to prevent HTML injection, though ideally n8n response is plain text or safe HTML
+      // Basic sanitization to prevent HTML injection
       const sanitizedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
       message.innerHTML = `<strong>${sender}:</strong><br>${sanitizedText}`;
       chatBox.appendChild(message);
@@ -125,49 +125,37 @@
           body: JSON.stringify({ userInput: userMessage })
         });
 
+        // Check for non-OK status codes first
+        if (!response.ok) {
+          let errorMsg = `HTTP error! status: ${response.status}`;
+          try {
+            // Attempt to get error details from the response body
+            const errorText = await response.text();
+            errorMsg += `. Response: ${errorText}`;
+          } catch (e) {
+            errorMsg += ". Could not read error response body.";
+          }
+          appendMessage('n8n', errorMsg, 'n8n');
+          return;
+        }
+
+        // If response.ok is true, try to get the response as text
         let responseText = '';
         try {
-          // Try to get the response as text first. This is more robust.
           responseText = await response.text();
         } catch (textError) {
-          // If even reading as text fails, it's a fundamental network issue.
           appendMessage('n8n', 'Error: Could not read response body.', 'n8n');
           console.error("Error reading response body:", textError);
           return;
         }
 
-        // Check if the response was OK (status code in 2xx range)
-        if (!response.ok) {
-          appendMessage('n8n', `HTTP error! status: ${response.status}. Response: ${responseText}`, 'n8n');
-          return;
-        }
-
-        // Now, try to parse the text as JSON.
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (jsonError) {
-          // If JSON.parse fails, display the raw text received.
-          appendMessage('n8n', `JSON Parsing Error. Received: ${responseText}`, 'n8n');
-          console.error("JSON Parsing Error:", jsonError);
-          console.error("Raw response text was:", responseText);
-          return;
-        }
-
-        // If parsing was successful, proceed to display the message
-        let messageToSend = '';
-        if (data.selectedTweet) {
-          messageToSend = data.selectedTweet;
-        } else {
-          // If selectedTweet is not found, display the whole JSON data as a string
-          messageToSend = JSON.stringify(data);
-        }
-        appendMessage('n8n', messageToSend, 'n8n');
+        // Display whatever text we received. This is the main change for this test.
+        appendMessage('n8n', responseText, 'n8n');
 
         chatBox.scrollTop = chatBox.scrollHeight;
 
       } catch (networkError) {
-        // This catches errors during the initial fetch itself (e.g., DNS lookup failure, network blocked, CORS preflight failure)
+        // This catches errors during the initial fetch itself (e.g., network blocked, DNS issues)
         appendMessage('n8n', 'Network Error: Could not connect to webhook.', 'n8n');
         console.error("Network Error:", networkError);
       }
